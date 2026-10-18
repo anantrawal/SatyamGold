@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SatyamGold — Plot Mapper Tool</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; height: 100vh; display: flex; flex-direction: column; }
+
+    /* ── Top Bar ── */
+    .topbar {
+      background: #16213e;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 2px solid #c97f0d;
+      flex-shrink: 0;
+    }
+    .topbar h1 { font-size: 18px; color: #c97f0d; }
+    .topbar .stats { margin-left: auto; font-size: 13px; color: #aaa; }
+    .topbar .stats span { color: #22c55e; font-weight: bold; }
+
+    /* ── Main area ── */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── SVG Map ── */
+    .map-area {
+      flex: 1;
+      overflow: auto;
+      background: #f0ebe0;
+      position: relative;
+    }
+    #svgContainer svg {
+      display: block;
+    }
+
+    /* Highlight unmapped */
+    .unmapped { cursor: pointer; }
+    .unmapped:hover { filter: brightness(1.3); }
+    .mapped { cursor: pointer; opacity: 0.85; }
+
+    /* ── Right Panel ── */
+    .panel {
+      width: 300px;
+      background: #16213e;
+      border-left: 1px solid #334;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-section { padding: 16px; border-bottom: 1px solid #334; }
+    .panel-section h3 { font-size: 13px; color: #c97f0d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+    /* Selected plot info */
+    .selected-info { background: #0f3460; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .selected-info .path-id { font-size: 11px; color: #888; }
+    .selected-info .plot-num { font-size: 20px; font-weight: bold; color: #22c55e; }
+
+    /* Input form */
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 8px 10px;
+      background: #0f3460;
+      border: 1px solid #334;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #c97f0d;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn-primary { background: #c97f0d; color: white; }
+    .btn-primary:hover { background: #a6610a; }
+    .btn-success { background: #22c55e; color: white; margin-top: 8px; }
+    .btn-success:hover { background: #16a34a; }
+    .btn-danger  { background: #ef4444; color: white; margin-top: 8px; }
+    .btn-danger:hover  { background: #dc2626; }
+
+    /* Mapped list */
+    .mapped-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .mapped-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: #0f3460;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .mapped-item .pnum { font-weight: bold; color: #22c55e; min-width: 50px; }
+    .mapped-item .pid  { color: #888; flex: 1; }
+    .mapped-item .del  { color: #ef4444; cursor: pointer; font-size: 16px; line-height: 1; }
+    .mapped-item .del:hover { color: #fca5a5; }
+
+    /* Popup */
+    .popup-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .popup-overlay.show { display: flex; }
+    .popup {
+      background: #16213e;
+      border: 2px solid #c97f0d;
+      border-radius: 16px;
+      padding: 24px;
+      width: 340px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .popup h2 { color: #c97f0d; margin-bottom: 6px; font-size: 16px; }
+    .popup .pid-display { font-size: 11px; color: #888; margin-bottom: 16px; }
+    .popup input, .popup select {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0f3460;
+      border: 1px solid #c97f0d;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+    .popup input:focus, .popup select:focus { outline: none; }
+    .popup-buttons { display: flex; gap: 10px; margin-top: 6px; }
+    .popup-buttons button {
+      flex: 1; padding: 10px; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: bold; cursor: pointer;
+    }
+    .btn-save   { background: #22c55e; color: white; }
+    .btn-cancel { background: #334; color: #aaa; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #22c55e;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 200;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    .hint { font-size: 11px; color: #666; margin-top: 8px; text-align: center; }
+    .progress-bar { height: 4px; background: #334; border-radius: 2px; margin-top: 8px; }
+    .progress-fill { height: 100%; background: #22c55e; border-radius: 2px; transition: width 0.3s; }
+  </style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <h1>🗺️ SatyamGold Plot Mapper</h1>
+  <div style="font-size:12px; color:#888;">
+    Click any plot → assign plot number → export seed file
+  </div>
+  <div class="stats">
+    Mapped: <span id="mappedCount">0</span> / <span id="totalCount">0</span>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- SVG Map -->
+  <div class="map-area">
+    <div id="svgContainer"></div>
+  </div>
+
+  <!-- Right Panel -->
+  <div class="panel">
+
+    <!-- Instructions -->
+    <div class="panel-section">
+      <h3>How to Use</h3>
+      <div style="font-size:12px; color:#aaa; line-height:1.6;">
+        1. Click any <span style="color:#22c55e">green/colored</span> plot<br>
+        2. Enter the plot number shown in SVG<br>
+        3. Fill size, block details<br>
+        4. Click Save<br>
+        5. When done → Export Seed File
+      </div>
+      <div class="progress-bar" style="margin-top:10px">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div class="panel-section">
+      <button class="btn btn-success" onclick="exportSeed()">⬇️ Export seedPlots.js</button>
+      <button class="btn btn-danger"  onclick="clearAll()"  style="margin-top:6px">🗑️ Clear All Mappings</button>
+      <p class="hint">Exports ready-to-use seed file</p>
+    </div>
+
+    <!-- Mapped List -->
+    <div class="panel-section" style="border-bottom:none; padding-bottom:6px;">
+      <h3>Mapped Plots (<span id="mappedCount2">0</span>)</h3>
+    </div>
+    <div class="mapped-list" id="mappedList">
+      <p style="color:#555; font-size:12px; text-align:center; margin-top:20px;">
+        No plots mapped yet.<br>Click a plot to start.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Popup -->
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup">
+    <h2>📍 Assign Plot Number</h2>
+    <div class="pid-display" id="popupPathId"></div>
+
+    <label style="font-size:12px;color:#aaa;display:block;margin-bottom:4px">Plot Number *</label>
+    <input type="text" id="inputPlotNumber" placeholder="e.g. 55, S/R 1, L1, E5" />
+
+    <label style="font-size:12px;color:#aaa;display:block;margin-bottom:4px">Plot Size *</label>
+    <select id="inputSize">
+      <option value="6.10x12.19">6.10x12.19 (S/R)</option>
+      <option value="6.10x18.29">6.10x18.29</option>
+      <option value="6.10x15.24" selected>6.10x15.24</option>
+      <option value="6.10x16.76">6.10x16.76</option>
+      <option value="6.10x13.30">6.10x13.30</option>
+      <option value="5.8x10.67">5.8x10.67 (LIG)</option>
+      <option value="3.60x10.67">3.60x10.67 (EWS)</option>
+    </select>
+
+    <label style="font-size:12px;color:#aaa;display:block;margin-bottom:4px">Block</label>
+    <select id="inputBlock">
+      <option value="Col A">Col A</option>
+      <option value="Col B">Col B</option>
+      <option value="Col C">Col C</option>
+      <option value="Col D">Col D</option>
+      <option value="Col E">Col E</option>
+      <option value="Col F">Col F</option>
+      <option value="S/R">S/R</option>
+      <option value="LIG">LIG</option>
+      <option value="EWS">EWS</option>
+    </select>
+
+    <label style="font-size:12px;color:#aaa;display:block;margin-bottom:4px">Facing</label>
+    <select id="inputFacing">
+      <option value="East">East</option>
+      <option value="West">West</option>
+      <option value="North">North</option>
+      <option value="South">South</option>
+    </select>
+
+    <label style="font-size:12px;color:#aaa;display:block;margin-bottom:4px">Price (₹)</label>
+    <input type="number" id="inputPrice" placeholder="e.g. 2500000" value="2500000" />
+
+    <label style="font-size:12px;color:#aaa;display:block;margin-bottom:4px">
+      <input type="checkbox" id="inputCorner" /> Corner Plot
+    </label>
+
+    <div class="popup-buttons">
+      <button class="btn-cancel" onclick="closePopup()">Cancel</button>
+      <button class="btn-save"   onclick="savePlot()">✅ Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────
+let mappings   = JSON.parse(localStorage.getItem('satyamgold_mappings') || '{}');
+let currentId  = null;
+let totalPaths = 0;
+
+// ── Load SVG ───────────────────────────────────────
+async function loadSVG() {
+  try {
+    // Try loading from same directory
+    const res  = await fetch('output.svg');
+    const text = await res.text();
+    const container = document.getElementById('svgContainer');
+    container.innerHTML = text;
+    const svg = container.querySelector('svg');
+    if (svg) {
+      svg.style.width  = '100%';
+      svg.style.height = 'auto';
+      svg.style.minWidth = '900px';
+    }
+    attachListeners();
+  } catch (e) {
+    document.getElementById('svgContainer').innerHTML = `
+      <div style="padding:40px;text-align:center;color:#ef4444;">
+        <h2>⚠️ Could not load output.svg</h2>
+        <p style="margin-top:10px;color:#aaa;">
+          Make sure <strong>output.svg</strong> and <strong>plot_mapper.html</strong>
+          are in the same folder, then open this file in browser.
+        </p>
+      </div>`;
+  }
+}
+
+// ── Attach click listeners to all path elements ────
+function attachListeners() {
+  const container = document.getElementById('svgContainer');
+  const paths = container.querySelectorAll('path[id]');
+  totalPaths = 0;
+
+  paths.forEach(el => {
+    const id = el.id;
+    if (!id || id.startsWith('defs') || !id.startsWith('path')) return;
+
+    // Skip very low IDs (likely background/defs)
+    const num = parseInt(id.replace('path',''));
+    if (num < 190) return;
+
+    totalPaths++;
+
+    // Apply saved mapping color
+    applyColor(el, id);
+
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => openPopup(id, el));
+    el.addEventListener('mouseenter', () => {
+      el.style.filter = 'brightness(1.25) drop-shadow(0 0 4px rgba(255,255,255,0.5))';
+    });
+    el.addEventListener('mouseleave', () => {
+      el.style.filter = '';
+    });
+  });
+
+  document.getElementById('totalCount').textContent = totalPaths;
+  updateStats();
+}
+
+function applyColor(el, id) {
+  if (mappings[id]) {
+    // Mapped — show gold color
+    el.setAttribute('fill', '#c97f0d');
+    el.style.opacity = '0.9';
+  }
+  // Unmapped keeps original SVG color
+}
+
+// ── Popup ──────────────────────────────────────────
+function openPopup(pathId, el) {
+  currentId = pathId;
+  document.getElementById('popupPathId').textContent = `SVG ID: ${pathId}`;
+  document.getElementById('popupOverlay').classList.add('show');
+
+  // Pre-fill if already mapped
+  const existing = mappings[pathId];
+  document.getElementById('inputPlotNumber').value = existing?.plotNumber || '';
+  document.getElementById('inputSize').value        = existing?.size       || '6.10x15.24';
+  document.getElementById('inputBlock').value       = existing?.block      || 'Col A';
+  document.getElementById('inputFacing').value      = existing?.facing     || 'East';
+  document.getElementById('inputPrice').value       = existing?.price      || 2500000;
+  document.getElementById('inputCorner').checked    = existing?.isCorner   || false;
+
+  setTimeout(() => document.getElementById('inputPlotNumber').focus(), 100);
+}
+
+function closePopup() {
+  document.getElementById('popupOverlay').classList.remove('show');
+  currentId = null;
+}
+
+function savePlot() {
+  const plotNumber = document.getElementById('inputPlotNumber').value.trim();
+  if (!plotNumber) { alert('Please enter a plot number!'); return; }
+
+  mappings[currentId] = {
+    plotNumber,
+    size:     document.getElementById('inputSize').value,
+    block:    document.getElementById('inputBlock').value,
+    facing:   document.getElementById('inputFacing').value,
+    price:    parseInt(document.getElementById('inputPrice').value) || 2500000,
+    isCorner: document.getElementById('inputCorner').checked,
+  };
+
+  // Save to localStorage
+  localStorage.setItem('satyamgold_mappings', JSON.stringify(mappings));
+
+  // Update SVG color
+  const el = document.getElementById(currentId);
+  if (el) applyColor(el, currentId);
+
+  closePopup();
+  updateStats();
+  showToast(`✅ Plot ${plotNumber} mapped to ${currentId}`);
+}
+
+// ── Delete mapping ─────────────────────────────────
+function deleteMapping(pathId) {
+  delete mappings[pathId];
+  localStorage.setItem('satyamgold_mappings', JSON.stringify(mappings));
+
+  // Restore original color from SVG
+  const el = document.getElementById(pathId);
+  if (el) el.removeAttribute('fill');
+
+  updateStats();
+  showToast(`🗑️ Removed mapping for ${pathId}`);
+}
+
+// ── Update stats & list ────────────────────────────
+function updateStats() {
+  const count = Object.keys(mappings).length;
+  document.getElementById('mappedCount').textContent  = count;
+  document.getElementById('mappedCount2').textContent = count;
+  document.getElementById('progressFill').style.width =
+    totalPaths ? `${(count / totalPaths) * 100}%` : '0%';
+
+  // Render list
+  const list = document.getElementById('mappedList');
+  const entries = Object.entries(mappings);
+
+  if (entries.length === 0) {
+    list.innerHTML = `<p style="color:#555;font-size:12px;text-align:center;margin-top:20px;">No plots mapped yet.<br>Click a plot to start.</p>`;
+    return;
+  }
+
+  // Sort by plot number
+  entries.sort((a, b) => {
+    const an = parseInt(a[1].plotNumber) || a[1].plotNumber;
+    const bn = parseInt(b[1].plotNumber) || b[1].plotNumber;
+    return an > bn ? 1 : -1;
+  });
+
+  list.innerHTML = entries.map(([pid, data]) => `
+    <div class="mapped-item">
+      <span class="pnum">P${data.plotNumber}</span>
+      <span class="pid">${pid}</span>
+      <span class="del" onclick="deleteMapping('${pid}')" title="Remove">×</span>
+    </div>
+  `).join('');
+}
+
+// ── Export seedPlots.js ────────────────────────────
+function exportSeed() {
+  const entries = Object.entries(mappings);
+  if (entries.length === 0) {
+    alert('No plots mapped yet! Map some plots first.');
+    return;
+  }
+
+  // Sort by plotNumber
+  entries.sort((a, b) => {
+    const an = parseInt(a[1].plotNumber) || a[1].plotNumber;
+    const bn = parseInt(b[1].plotNumber) || b[1].plotNumber;
+    return an > bn ? 1 : -1;
+  });
+
+  const plotLines = entries.map(([pid, d]) =>
+    `    { id:'${pid}', plotNumber:'${d.plotNumber}', size:'${d.size}', block:'${d.block}', facing:'${d.facing}', isCorner:${d.isCorner}, price:${d.price} },`
+  ).join('\n');
+
+  const allIds = entries.map(([pid]) => `  '${pid}'`).join(',\n');
+
+  const seed = `import { db } from './config';
+import { doc, setDoc } from 'firebase/firestore';
+
+const savePlot = async (id, data) => {
+  await setDoc(doc(db, 'path', id), data);
+};
+
+// ALL_PLOT_IDS for PlotMapPage.js
+export const ALL_PLOT_IDS = [
+${allIds},
+];
+
+export const seedPlots = async () => {
+  console.log('🌱 Seeding ${entries.length} plots...');
+  let count = 0;
+
+  const plots = [
+${plotLines}
+  ];
+
+  for (const p of plots) {
+    try {
+      await savePlot(p.id, {
+        plotNumber: p.plotNumber,
+        size:       p.size,
+        block:      p.block,
+        facing:     p.facing,
+        isCorner:   p.isCorner,
+        price:      p.price,
+        status:     'available',
+        customer:   null,
+        createdAt:  new Date().toISOString(),
+        updatedAt:  new Date().toISOString(),
+      });
+      count++;
+      console.log(\`✅ \${p.id} → Plot \${p.plotNumber}\`);
+    } catch (err) {
+      console.error(\`❌ \${p.id} failed:\`, err.message);
+    }
+  }
+  const msg = \`🎉 Done! \${count} plots created.\`;
+  console.log(msg);
+  alert(msg);
+};
+
+export const seedOwner = async (ownerUid) => {
+  const { createUser } = await import('./services');
+  await createUser(ownerUid, {
+    name:      'Owner',
+    email:     'owner@satyamgold.com',
+    role:      'owner',
+    createdAt: new Date().toISOString(),
+  });
+  console.log('👑 Owner profile created');
+};
+`;
+
+  const blob = new Blob([seed], { type: 'text/javascript' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'seedPlots.js';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✅ seedPlots.js exported with ${entries.length} plots!`);
+}
+
+// ── Clear all ──────────────────────────────────────
+function clearAll() {
+  if (!confirm('Clear ALL mappings? This cannot be undone!')) return;
+  mappings = {};
+  localStorage.removeItem('satyamgold_mappings');
+  // Reload SVG to restore colors
+  loadSVG();
+  showToast('🗑️ All mappings cleared');
+}
+
+// ── Toast ──────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Keyboard shortcut ──────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePopup();
+  if (e.key === 'Enter' && currentId) savePlot();
+});
+
+// ── Init ───────────────────────────────────────────
+loadSVG();
+</script>
+</body>
+</html>

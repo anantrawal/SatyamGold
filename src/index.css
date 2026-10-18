@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f8f5f0;
+  color: #2d2d2d;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #c97f0d; border-radius: 3px; }
+
+/* Plot map SVG styles */
+.plot-map-container {
+  overflow: hidden;
+  cursor: grab;
+  background: #e8e0d0;
+  border-radius: 12px;
+}
+.plot-map-container:active { cursor: grabbing; }
+
+.plot-shape {
+  cursor: pointer;
+  transition: opacity 0.2s;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+.plot-shape:hover { opacity: 0.8; stroke-width: 3; }
+
+.plot-label {
+  pointer-events: none;
+  font-size: 11px;
+  font-weight: 600;
+  fill: #fff;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+/* Status colors */
+.status-available { fill: #22c55e; }
+.status-booked    { fill: #f59e0b; }
+.status-sold      { fill: #ef4444; }
+.status-hold      { fill: #3b82f6; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.slide-in { animation: slideIn 0.3s ease forwards; }
